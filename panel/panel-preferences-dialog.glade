@@ -58,6 +58,19 @@
     <property name="can_focus">False</property>
     <property name="icon_name">list-remove-symbolic</property>
   </object>
+  <object class="GtkAdjustment" id="popdown-delay">
+    <property name="upper">2000</property>
+    <property name="value">350</property>
+    <property name="step_increment">50</property>
+    <property name="page_increment">100</property>
+  </object>
+  <object class="GtkAdjustment" id="popdown-slow-multiplier">
+    <property name="lower">1</property>
+    <property name="upper">10</property>
+    <property name="value">4</property>
+    <property name="step_increment">1</property>
+    <property name="page_increment">1</property>
+  </object>
   <object class="GtkAdjustment" id="leave-opacity">
     <property name="upper">100</property>
     <property name="value">100</property>
@@ -441,6 +454,92 @@
                           </packing>
                         </child>
                         <child>
+                          <object class="GtkBox">
+                            <property name="visible">True</property>
+                            <property name="can_focus">False</property>
+                            <property name="spacing">12</property>
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="can_focus">False</property>
+                                <property name="margin_left">12</property>
+                                <property name="label" translatable="yes">Hide _delay (ms):</property>
+                                <property name="use_underline">True</property>
+                                <property name="xalign">0</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkSpinButton" id="popdown-delay-spin">
+                                <property name="visible">True</property>
+                                <property name="can_focus">True</property>
+                                <property name="tooltip_text" translatable="yes">Time in milliseconds to wait before hiding the panel after the mouse leaves. Set to 0 for instant hide.</property>
+                                <property name="halign">end</property>
+                                <property name="valign">center</property>
+                                <property name="adjustment">popdown-delay</property>
+                              </object>
+                              <packing>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                                <property name="pack_type">end</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="left_attach">0</property>
+                            <property name="top_attach">6</property>
+                            <property name="width">2</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="visible">True</property>
+                            <property name="can_focus">False</property>
+                            <property name="spacing">12</property>
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="can_focus">False</property>
+                                <property name="margin_left">12</property>
+                                <property name="label" translatable="yes">Slow hide _multiplier:</property>
+                                <property name="use_underline">True</property>
+                                <property name="xalign">0</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkSpinButton" id="popdown-slow-multiplier-spin">
+                                <property name="visible">True</property>
+                                <property name="can_focus">True</property>
+                                <property name="tooltip_text" translatable="yes">Multiplier applied to the hide delay during drag-and-drop and initial panel display, giving extra time before the panel hides.</property>
+                                <property name="halign">end</property>
+                                <property name="valign">center</property>
+                                <property name="adjustment">popdown-slow-multiplier</property>
+                              </object>
+                              <packing>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                                <property name="pack_type">end</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="left_attach">0</property>
+                            <property name="top_attach">7</property>
+                            <property name="width">2</property>
+                          </packing>
+                        </child>
+                        <child>
                           <object class="GtkCheckButton" id="enable-struts">
                             <property name="label" translatable="yes">_Reserve space on screen edges for the panel</property>
                             <property name="visible">True</property>
@@ -453,7 +552,7 @@
                           </object>
                           <packing>
                             <property name="left_attach">0</property>
-                            <property name="top_attach">6</property>
+                            <property name="top_attach">8</property>
                             <property name="width">2</property>
                           </packing>
                         </child>

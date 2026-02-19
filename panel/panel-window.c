@@ -56,9 +56,10 @@
 
 #define SNAP_DISTANCE         (10)
 #define DEFAULT_POPUP_DELAY   (225)
-#define DEFAULT_POPDOWN_DELAY (0)
+#define DEFAULT_POPDOWN_DELAY (350)
 #define DEFAULT_AUTOHIDE_SIZE (3)
 #define DEFAULT_POPDOWN_SPEED (25)
+#define DEFAULT_POPDOWN_SLOW_MULTIPLIER (4)
 #define HANDLE_SPACING        (4)
 #define HANDLE_DOTS           (2)
 #define HANDLE_PIXELS         (2)
@@ -197,6 +198,8 @@ enum
   PROP_POSITION_LOCKED,
   PROP_AUTOHIDE_BEHAVIOR,
   PROP_POPDOWN_SPEED,
+  PROP_POPDOWN_DELAY,
+  PROP_POPDOWN_SLOW_MULTIPLIER,
   PROP_SPAN_MONITORS,
   PROP_OUTPUT_NAME,
   PROP_POSITION,
@@ -345,11 +348,12 @@ struct _PanelWindow
   gint                 autohide_block;
   gint                 autohide_size;
   guint                popdown_speed;
+  guint                popdown_slow_multiplier;
   gint                 popdown_progress;
 
   /* popup/down delay from gtk style */
   gint                 popup_delay;
-  gint                 popdown_delay;
+  guint                popdown_delay;
 
   /* whether the window position is locked */
   guint                position_locked : 1;
@@ -487,6 +491,18 @@ panel_window_class_init (PanelWindowClass *klass)
                                                       G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class,
+                                   PROP_POPDOWN_DELAY,
+                                   g_param_spec_uint ("popdown-delay", NULL, NULL,
+                                                      0, 2000, DEFAULT_POPDOWN_DELAY,
+                                                      G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class,
+                                   PROP_POPDOWN_SLOW_MULTIPLIER,
+                                   g_param_spec_uint ("popdown-slow-multiplier", NULL, NULL,
+                                                      1, 10, DEFAULT_POPDOWN_SLOW_MULTIPLIER,
+                                                      G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class,
                                    PROP_SPAN_MONITORS,
                                    g_param_spec_boolean ("span-monitors", NULL, NULL,
                                                          FALSE,
@@ -516,14 +532,6 @@ panel_window_class_init (PanelWindowClass *klass)
                                                              "Time before the panel will unhide on an enter event",
                                                              1, G_MAXINT,
                                                              DEFAULT_POPUP_DELAY,
-                                                             G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
-
-  gtk_widget_class_install_style_property (gtkwidget_class,
-                                           g_param_spec_int ("popdown-delay",
-                                                             NULL,
-                                                             "Time before the panel will hide on a leave event",
-                                                             1, G_MAXINT,
-                                                             DEFAULT_POPDOWN_DELAY,
                                                              G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   gtk_widget_class_install_style_property (gtkwidget_class,
@@ -603,6 +611,7 @@ panel_window_init (PanelWindow *window)
   window->popup_delay = DEFAULT_POPUP_DELAY;
   window->popdown_delay = DEFAULT_POPDOWN_DELAY;
   window->popdown_speed = DEFAULT_POPDOWN_SPEED;
+  window->popdown_slow_multiplier = DEFAULT_POPDOWN_SLOW_MULTIPLIER;
   window->popdown_progress = 0;
   window->base_x = -1;
   window->base_y = -1;
@@ -688,6 +697,14 @@ panel_window_get_property (GObject    *object,
 
     case PROP_POPDOWN_SPEED:
       g_value_set_uint (value, window->popdown_speed);
+      break;
+
+    case PROP_POPDOWN_DELAY:
+      g_value_set_uint (value, window->popdown_delay);
+      break;
+
+    case PROP_POPDOWN_SLOW_MULTIPLIER:
+      g_value_set_uint (value, window->popdown_slow_multiplier);
       break;
 
     case PROP_SPAN_MONITORS:
@@ -852,6 +869,22 @@ panel_window_set_property (GObject      *object,
       if (window->popdown_speed != val_uint)
         {
           window->popdown_speed = val_uint;
+        }
+      break;
+
+    case PROP_POPDOWN_DELAY:
+      val_uint = g_value_get_uint (value);
+      if (window->popdown_delay != val_uint)
+        {
+          window->popdown_delay = val_uint;
+        }
+      break;
+
+    case PROP_POPDOWN_SLOW_MULTIPLIER:
+      val_uint = g_value_get_uint (value);
+      if (window->popdown_slow_multiplier != val_uint)
+        {
+          window->popdown_slow_multiplier = val_uint;
         }
       break;
 
@@ -1721,7 +1754,6 @@ panel_window_style_updated (GtkWidget *widget)
 
   gtk_widget_style_get (GTK_WIDGET (widget),
                         "popup-delay", &window->popup_delay,
-                        "popdown-delay", &window->popdown_delay,
                         "autohide-size", &window->autohide_size,
                         NULL);
   /* Make sure the background and borders are redrawn on Gtk theme changes */
@@ -2654,7 +2686,7 @@ panel_window_autohide_queue (PanelWindow   *window,
       if (new_state == AUTOHIDE_POPDOWN)
         delay = window->popdown_delay;
       else if (new_state == AUTOHIDE_POPDOWN_SLOW)
-        delay = window->popdown_delay * 4;
+        delay = window->popdown_delay * window->popdown_slow_multiplier;
       else
         delay = window->popup_delay;
 
