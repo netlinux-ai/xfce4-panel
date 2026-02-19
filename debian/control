@@ -1,0 +1,32 @@
+Source: xfce4-panel
+Section: xfce
+Priority: optional
+Maintainer: Graham Sutherland <graham@netlinux.co.uk>
+Build-Depends: debhelper (>= 11), pkg-config, intltool,
+  xfce4-dev-tools, libtool, automake, autoconf,
+  libgtk-3-dev (>= 3.24.0),
+  libglib2.0-dev (>= 2.66.0),
+  libcairo2-dev (>= 1.16.0),
+  libexo-2-dev (>= 0.11.2),
+  libgarcon-1-dev (>= 4.17.0),
+  libgarcon-gtk3-1-dev (>= 4.17.0),
+  libxfce4ui-2-dev (>= 4.17.1),
+  libxfce4util-dev (>= 4.17.2),
+  libxfconf-0-dev (>= 4.13.2),
+  libwnck-3-dev (>= 3.0),
+  libdbusmenu-gtk3-dev (>= 16.04.0),
+  libx11-dev,
+  gobject-introspection,
+  libgirepository1.0-dev,
+  gtk-doc-tools
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+
+Package: xfce4-panel
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Xfce4 desktop panel
+  The Xfce4 panel is a lightweight desktop panel for the Xfce desktop
+  environment. It provides application launchers, window management,
+  workspace switching, and a plugin system for additional functionality
+  including system tray, clock, and application menus.

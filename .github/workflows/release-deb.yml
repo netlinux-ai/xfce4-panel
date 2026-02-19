@@ -1,0 +1,98 @@
+name: Build .deb package
+
+on:
+  push:
+    branches: [netlinux]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential pkg-config intltool libtool automake autoconf \
+            xfce4-dev-tools \
+            libgtk-3-dev libglib2.0-dev libcairo2-dev \
+            libexo-2-dev libgarcon-1-dev libgarcon-gtk3-1-dev \
+            libxfce4ui-2-dev libxfce4util-dev libxfconf-0-dev \
+            libwnck-3-dev libdbusmenu-gtk3-dev \
+            libx11-dev \
+            gobject-introspection libgirepository1.0-dev \
+            gtk-doc-tools
+
+      - name: Configure
+        run: |
+          ./autogen.sh --prefix=/usr --sysconfdir=/etc --disable-static
+
+      - name: Build
+        run: make -j$(nproc)
+
+      - name: Determine version
+        id: version
+        run: |
+          base=$(sed -n 's/^m4_define(\[xfce4_panel_version_major\], \[\([0-9]*\)\])/\1/p' configure.ac.in)
+          minor=$(sed -n 's/^m4_define(\[xfce4_panel_version_minor\], \[\([0-9]*\)\])/\1/p' configure.ac.in)
+          micro=$(sed -n 's/^m4_define(\[xfce4_panel_version_micro\], \[\([0-9]*\)\])/\1/p' configure.ac.in)
+          ver="${base}.${minor}.${micro}"
+          rev=${{ github.run_number }}
+          echo "version=${ver}-${rev}netlinux1" >> "$GITHUB_OUTPUT"
+          echo "tag=v${ver}-${rev}netlinux1" >> "$GITHUB_OUTPUT"
+
+      - name: Package with checkinstall
+        run: |
+          sudo apt-get install -y checkinstall
+          sudo checkinstall --default \
+            --pkgname=xfce4-panel \
+            --pkgversion="${{ steps.version.outputs.version }}" \
+            --maintainer="graham@netlinux.co.uk" \
+            --pakdir=. \
+            --install=no \
+            --fstrans=yes
+
+      - name: Repack .deb for reprepro compatibility
+        run: |
+          DEB=$(ls xfce4-panel_*.deb)
+          sudo chmod 666 "$DEB"
+          mkdir repack && cd repack
+          ar x "../$DEB"
+          for f in *.zst; do
+            [ -f "$f" ] || continue
+            zstd -d "$f"
+            xz "${f%.zst}"
+            rm "$f"
+          done
+          rm "../$DEB"
+          ar rcs "../$DEB" debian-binary control.tar.xz data.tar.xz
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: xfce4-panel ${{ steps.version.outputs.version }}
+          body: |
+            Automated build from commit ${{ github.sha }}
+
+            Install: `sudo dpkg -i xfce4-panel_*.deb`
+          files: xfce4-panel_*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify package repository
+        run: |
+          sleep 5
+          SIGNATURE=$(echo -n '{"repo":"netlinux-ai/xfce4-panel","tag":"${{ steps.version.outputs.tag }}"}' \
+            | openssl dgst -sha256 -hmac "${{ secrets.WEBHOOK_SECRET }}" -binary \
+            | xxd -p -c 256)
+          curl -sf -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-Webhook-Signature: sha256=${SIGNATURE}" \
+            -d '{"repo":"netlinux-ai/xfce4-panel","tag":"${{ steps.version.outputs.tag }}"}' \
+            https://packages.netlinux.co.uk/webhook/update-repo
