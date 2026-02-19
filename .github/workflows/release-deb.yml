@@ -55,7 +55,7 @@ jobs:
             --maintainer="graham@netlinux.co.uk" \
             --pakdir=. \
             --install=no \
-            --fstrans=yes
+            --fstrans=no
 
       - name: Repack .deb for reprepro compatibility
         run: |
