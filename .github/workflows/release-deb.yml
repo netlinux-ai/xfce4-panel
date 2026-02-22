@@ -73,6 +73,7 @@ jobs:
           # Patch control file: add versioned Provides/Replaces for libxfce4panel-2.0-4
           mkdir control-tmp && cd control-tmp
           tar xf ../control.tar.xz
+          sed -i '/^Provides:/d; /^Replaces:/d' control
           sed -i "/^Description:/i Provides: libxfce4panel-2.0-4 (= ${{ steps.version.outputs.upstream_version }})\nReplaces: libxfce4panel-2.0-4" control
           tar cJf ../control.tar.xz ./*
           cd ..
