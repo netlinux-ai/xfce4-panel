@@ -55,7 +55,6 @@ jobs:
             --maintainer="graham@netlinux.co.uk" \
             --provides="libxfce4panel-2.0-4" \
             --replaces="libxfce4panel-2.0-4" \
-            --conflicts="libxfce4panel-2.0-4" \
             --pakdir=. \
             --install=no \
             --fstrans=no
