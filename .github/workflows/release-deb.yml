@@ -45,6 +45,7 @@ jobs:
           rev=${{ github.run_number }}
           echo "version=${ver}-${rev}netlinux1" >> "$GITHUB_OUTPUT"
           echo "tag=v${ver}-${rev}netlinux1" >> "$GITHUB_OUTPUT"
+          echo "upstream_version=${ver}" >> "$GITHUB_OUTPUT"
 
       - name: Package with checkinstall
         run: |
@@ -53,8 +54,6 @@ jobs:
             --pkgname=xfce4-panel \
             --pkgversion="${{ steps.version.outputs.version }}" \
             --maintainer="graham@netlinux.co.uk" \
-            --provides="libxfce4panel-2.0-4" \
-            --replaces="libxfce4panel-2.0-4" \
             --pakdir=. \
             --install=no \
             --fstrans=no
@@ -71,6 +70,13 @@ jobs:
             xz "${f%.zst}"
             rm "$f"
           done
+          # Patch control file: add versioned Provides/Replaces for libxfce4panel-2.0-4
+          mkdir control-tmp && cd control-tmp
+          tar xf ../control.tar.xz
+          sed -i "/^Description:/i Provides: libxfce4panel-2.0-4 (= ${{ steps.version.outputs.upstream_version }})\nReplaces: libxfce4panel-2.0-4" control
+          tar cJf ../control.tar.xz ./*
+          cd ..
+          rm -rf control-tmp
           rm "../$DEB"
           ar rcs "../$DEB" debian-binary control.tar.xz data.tar.xz
 
