@@ -30,7 +30,7 @@ jobs:
 
       - name: Configure
         run: |
-          ./autogen.sh --prefix=/usr --sysconfdir=/etc --disable-static
+          ./autogen.sh --prefix=/usr --sysconfdir=/etc --libdir=/usr/lib/x86_64-linux-gnu --disable-static
 
       - name: Build
         run: make -j$(nproc)

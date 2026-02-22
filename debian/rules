@@ -3,4 +3,4 @@
 	dh $@
 
 override_dh_auto_configure:
-	./autogen.sh --prefix=/usr --sysconfdir=/etc --disable-static
+	./autogen.sh --prefix=/usr --sysconfdir=/etc --libdir=/usr/lib/x86_64-linux-gnu --disable-static
