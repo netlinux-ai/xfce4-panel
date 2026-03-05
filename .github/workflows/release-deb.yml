@@ -56,6 +56,7 @@ jobs:
             --maintainer="graham@netlinux.co.uk" \
             --pakdir=. \
             --install=no \
+            --requires="libgtk-3-0t64,libglib2.0-0t64,libwnck-3-0,libxfce4ui-2-0,libxfce4util7,libxfconf-0-3,libepoxy0,libstartup-notification0,libcairo2,libpango-1.0-0,libgdk-pixbuf-2.0-0,libx11-6,libxcomposite1,libxdamage1,libxfixes3,libxrandr2,libxrender1,libxext6,libxinerama1,libxi6,libxcursor1" \
             --fstrans=no
 
       - name: Repack .deb for reprepro compatibility
