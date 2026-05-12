@@ -1,153 +1,28 @@
-name: Build .deb package (dual-suite)
+name: Trigger dev build
+# All build/test/publish happens on dev (the netlinux nightly host).
+# This GHA workflow is a thin trigger: on every push, sign and POST the
+# commit info to the apt-server webhook, which SSHes to dev and starts
+# a single-repo build for both bookworm and resolute suites.
 
 on:
   push:
-    branches: [netlinux]
-
-permissions:
-  contents: write
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: bookworm
-            container: debian:bookworm
-          - target: resolute
-            container: ubuntu:26.04
-    runs-on: ubuntu-24.04
-    container:
-      image: ${{ matrix.container }}
-
+  trigger:
+    runs-on: ubuntu-latest
     steps:
-      - name: Bootstrap container
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            ca-certificates curl git xz-utils zstd \
-            build-essential dpkg-dev sudo
-
-      - uses: actions/checkout@v4
-
-      - name: Install build dependencies
-        run: |
-          apt-get update
-          apt-get install -y \
-            build-essential pkg-config intltool libtool automake autoconf \
-            xfce4-dev-tools \
-            libgtk-3-dev libglib2.0-dev libcairo2-dev \
-            libexo-2-dev libgarcon-1-dev libgarcon-gtk3-1-dev \
-            libxfce4ui-2-dev libxfce4util-dev libxfconf-0-dev \
-            libwnck-3-dev libdbusmenu-gtk3-dev \
-            libx11-dev \
-            gobject-introspection libgirepository1.0-dev \
-            gtk-doc-tools
-
-
-      - name: Configure
-        run: |
-          ./autogen.sh --prefix=/usr --sysconfdir=/etc --libdir=/usr/lib/x86_64-linux-gnu --disable-static
-
-
-      - name: Build
-        run: make -j$(nproc)
-
-
-      - name: Determine version
-        id: version
-        run: |
-          base=$(sed -n 's/^m4_define(\[xfce4_panel_version_major\], \[\([0-9]*\)\])/\1/p' configure.ac.in)
-          minor=$(sed -n 's/^m4_define(\[xfce4_panel_version_minor\], \[\([0-9]*\)\])/\1/p' configure.ac.in)
-          micro=$(sed -n 's/^m4_define(\[xfce4_panel_version_micro\], \[\([0-9]*\)\])/\1/p' configure.ac.in)
-          ver="${base}.${minor}.${micro}"
-          rev=${{ github.run_number }}
-          echo "version=${ver}-${rev}netlinux1~${{ matrix.target }}1" >> "$GITHUB_OUTPUT"
-          echo "tag=v${ver}-${rev}netlinux1~${{ matrix.target }}1" >> "$GITHUB_OUTPUT"
-          echo "upstream_version=${ver}" >> "$GITHUB_OUTPUT"
-
-
-      - name: Package with checkinstall
-        run: |
-          apt-get install -y checkinstall
-          checkinstall --default \
-            --pkgname=xfce4-panel \
-            --pkgversion="${{ steps.version.outputs.version }}" \
-            --maintainer="graham@netlinux.co.uk" \
-            --pakdir=. \
-            --install=no \
-            --requires="libgtk-3-0t64,libglib2.0-0t64,libwnck-3-0,libxfce4ui-2-0,libxfce4util7,libxfconf-0-3,libepoxy0,libstartup-notification0,libcairo2,libpango-1.0-0,libgdk-pixbuf-2.0-0,libx11-6,libxcomposite1,libxdamage1,libxfixes3,libxrandr2,libxrender1,libxext6,libxinerama1,libxi6,libxcursor1" \
-            --fstrans=no
-
-
-      - name: Repack .deb for reprepro compatibility
-        run: |
-          DEB=$(ls xfce4-panel_*.deb)
-          chmod 666 "$DEB"
-          mkdir repack && cd repack
-          ar x "../$DEB"
-          for f in *.zst; do
-            [ -f "$f" ] || continue
-            zstd -d "$f"
-            xz "${f%.zst}"
-            rm "$f"
-          done
-          # Patch control file: add versioned Provides/Replaces for libxfce4panel-2.0-4
-          mkdir control-tmp && cd control-tmp
-          tar xf ../control.tar.xz
-          sed -i '/^Provides:/d; /^Replaces:/d' control
-          sed -i "/^Description:/i Provides: libxfce4panel-2.0-4 (= ${{ steps.version.outputs.upstream_version }})\nReplaces: libxfce4panel-2.0-4" control
-          tar cJf ../control.tar.xz ./*
-          cd ..
-          rm -rf control-tmp
-          rm "../$DEB"
-          ar rcs "../$DEB" debian-binary control.tar.xz data.tar.xz
-
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: deb-${{ matrix.target }}
-          path: |
-            **/*.deb
-          if-no-files-found: error
-
-  release:
-    needs: build
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Compute tag
-        id: tag
-        run: echo "tag=v${{ github.run_number }}-dualsuite" >> "$GITHUB_OUTPUT"
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: Build ${{ github.run_number }} (bookworm + resolute)
-          body: |
-            Dual-suite build from commit ${{ github.sha }}.
-            Both ~bookworm1 and ~resolute1 .debs are attached.
-          files: artifacts/**/*.deb
-          fail_on_unmatched_files: true
+      - name: Notify dev build pipeline
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Notify package repository
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          REF: ${{ github.ref }}
+          SECRET: ${{ secrets.WEBHOOK_SECRET }}
         run: |
-          sleep 5
-          PAYLOAD='{"repo":"netlinux-ai/xfce4-panel","tag":"${{ steps.tag.outputs.tag }}"}'
-          SIGNATURE=$(echo -n "$PAYLOAD" \
-            | openssl dgst -sha256 -hmac "${{ secrets.WEBHOOK_SECRET }}" -binary \
-            | xxd -p -c 256)
-          curl -sf -X POST \
+          PAYLOAD=$(printf '{"repo":"%s","sha":"%s","ref":"%s"}' "$REPO" "$SHA" "$REF")
+          SIGNATURE=$(printf %s "$PAYLOAD" | openssl dgst -sha256 -hmac "$SECRET" -binary | xxd -p -c 256)
+          echo "Dispatching build for $REPO @ ${SHA:0:8} ($REF)"
+          curl -sSf -X POST \
             -H "Content-Type: application/json" \
             -H "X-Webhook-Signature: sha256=${SIGNATURE}" \
             -d "$PAYLOAD" \
-            https://packages.netlinux.co.uk/webhook/update-repo
+            https://packages.netlinux.co.uk/webhook/build
