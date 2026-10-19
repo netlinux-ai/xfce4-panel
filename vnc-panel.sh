@@ -1,7 +1,9 @@
 #!/bin/bash
 # Run xfce4-panel inside a VNC desktop (Xtightvnc + xfwm4) on a build host.
 #
-# Usage: vnc-panel.sh start|stop|restart|status
+# Usage: vnc-panel.sh start|stop|restart|status|exec <command...>
+#   exec runs a command inside the running session (same DISPLAY, HOME and
+#   D-Bus bus), e.g. exec xfconf-query -c xfce4-panel -l -v
 #
 # Runs on the host that built the panel (default prefix ~/panel-test, from
 #   ./configure --prefix=$HOME/panel-test --libdir=$HOME/panel-test/lib
@@ -92,10 +94,25 @@ status() {
     echo "xfwm4:  $(pgrep -u "$(id -u)" -x xfwm4 | tr '\n' ' ')"
 }
 
+session_exec() {
+    local pid env_file
+    pid=$(pgrep -u "$(id -u)" -x xfce4-panel | head -n1)
+    [ -n "$pid" ] || { echo "panel is not running" >&2; exit 1; }
+    env_file=/proc/$pid/environ
+    exec env -i \
+        HOME="$TEST_HOME" PATH="$PANEL_PREFIX/bin:$PATH" LD_LIBRARY_PATH="$PANEL_PREFIX/lib" \
+        DISPLAY=":$DISPLAY_NUM" \
+        DBUS_SESSION_BUS_ADDRESS="$(tr '\0' '\n' < "$env_file" | sed -n 's/^DBUS_SESSION_BUS_ADDRESS=//p')" \
+        XDG_CONFIG_HOME="$TEST_HOME/.config" XDG_CACHE_HOME="$TEST_HOME/.cache" \
+        XDG_DATA_HOME="$TEST_HOME/.local/share" XDG_RUNTIME_DIR="$RUN_DIR" \
+        "$@"
+}
+
 case "${1:-}" in
     start)   start ;;
     stop)    stop ;;
     restart) stop; sleep 1; start ;;
     status)  status ;;
-    *)       echo "Usage: $0 start|stop|restart|status" >&2; exit 2 ;;
+    exec)    shift; [ "$#" -gt 0 ] || { echo "Usage: $0 exec <command...>" >&2; exit 2; }; session_exec "$@" ;;
+    *)       echo "Usage: $0 start|stop|restart|status|exec <command...>" >&2; exit 2 ;;
 esac
