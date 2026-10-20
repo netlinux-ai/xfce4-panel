@@ -4,6 +4,9 @@
 # Usage: xephyr-panel.sh [command...]
 #   Default command is the panel binary built in /Data/xfce4-panel
 #   (override with PANEL_BIN). Any arguments replace the command.
+#   For a panel installed to a private prefix (e.g. ~/panel-test):
+#     P=$HOME/panel-test XDG_DATA_DIRS=$P/share:/usr/share \
+#       XDG_CONFIG_DIRS=$P/etc/xdg:/etc/xdg PANEL_BIN=$P/bin/xfce4-panel xephyr-panel.sh
 #
 # Isolation: the nested session gets its own HOME, XDG dirs and D-Bus
 # session bus, so it cannot read or write the real desktop's config or
@@ -63,8 +66,15 @@ printf 'Xft.dpi: %s\n' "$DPI" | DISPLAY="$TEST_DISPLAY" xrdb -merge
 
 echo "Xephyr $TEST_DISPLAY at $SIZE, DPI $DPI (pid $XEPHYR_PID), HOME=$TEST_HOME"
 
+# A panel installed to a private prefix finds its default config and plugin
+# .desktop files through these, so pass them through when set.
+EXTRA_ENV=()
+[ -n "${XDG_DATA_DIRS:-}" ] && EXTRA_ENV+=("XDG_DATA_DIRS=$XDG_DATA_DIRS")
+[ -n "${XDG_CONFIG_DIRS:-}" ] && EXTRA_ENV+=("XDG_CONFIG_DIRS=$XDG_CONFIG_DIRS")
+
 # Run the command inside the nested display with isolated HOME/XDG/D-Bus.
 setsid env -i \
+    "${EXTRA_ENV[@]}" \
     HOME="$TEST_HOME" \
     PATH="$PATH" \
     DISPLAY="$TEST_DISPLAY" \
