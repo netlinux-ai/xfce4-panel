@@ -29,6 +29,11 @@ JOBS=${JOBS:-$(nproc)}
 KEEP=${KEEP:-0}
 SKIP_BUILD=${SKIP_BUILD:-0}
 
+step() { printf '\n==> %s\n' "$*"; }
+die()  { echo "FAIL: $*" >&2; exit 1; }
+
+[ -e "/tmp/.X11-unix/X$TEST_DISPLAY" ] && die "display :$TEST_DISPLAY already in use (set TEST_DISPLAY)"
+
 if [ -n "${WORK_DIR:-}" ]; then
     mkdir -p "$WORK_DIR"
 else
@@ -42,9 +47,6 @@ TEST_HOME=$WORK_DIR/home
 PASSWD_FILE=$WORK_DIR/vnc-passwd
 RFB_PORT=$((5900 + TEST_DISPLAY))
 
-step() { printf '\n==> %s\n' "$*"; }
-die()  { echo "FAIL: $*" >&2; exit 1; }
-
 cleanup() {
     status=$?
     if [ "$KEEP" != 1 ]; then
@@ -56,7 +58,6 @@ cleanup() {
 trap cleanup EXIT
 
 command -v Xtightvnc >/dev/null || die "Xtightvnc not installed"
-[ -e "/tmp/.X11-unix/X$TEST_DISPLAY" ] && die "display :$TEST_DISPLAY already in use (set TEST_DISPLAY)"
 
 if [ "$SKIP_BUILD" != 1 ]; then
     step "Copying tracked source to $BUILD_SRC"
