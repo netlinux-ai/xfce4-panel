@@ -76,46 +76,64 @@ def wait_for(cond, timeout, step=0.1):
     return None
 
 
-def edge_point(geo):
-    """Pointer position on the screen edge nearest the panel (reveals it)."""
-    x, y, w, h = geo
-    cx, cy = x + w // 2, y + h // 2
-    dist = {"top": cy, "bottom": SCREEN_H - cy, "left": cx, "right": SCREEN_W - cx}
-    side = min(dist, key=dist.get)
-    return {"top": (cx, 0), "bottom": (cx, SCREEN_H - 1),
-            "left": (0, cy), "right": (SCREEN_W - 1, cy)}[side]
+def panel_state():
+    """Geometry of every viewable, wide xfce4-panel window (changes when it shows/hides)."""
+    found = []
+
+    def walk(w):
+        try:
+            cls = w.get_wm_class()
+            if cls and "xfce4-panel" in cls[0].lower():
+                g = w.get_geometry()
+                if g.width >= 200 and w.get_attributes().map_state == X.IsViewable:
+                    c = root.translate_coords(w, 0, 0)
+                    found.append((c.x, c.y, g.width, g.height))
+            for c in w.query_tree().children:
+                walk(c)
+        except Exception:
+            pass
+
+    walk(root)
+    return tuple(sorted(found))
 
 
-def settled(w, quiet=1.5, timeout=15):
-    """Wait until the panel geometry stops changing; return it."""
+def edge_point():
+    """Pointer position that reveals the panel: bottom screen edge (see xfce4-panel.xml)."""
+    return (SCREEN_W // 2, SCREEN_H - 1)
+
+
+def settled(quiet=1.5, timeout=15):
+    """Wait until the panel state stops changing; return it."""
     last, since = None, time.monotonic()
     end = since + timeout
     while time.monotonic() < end:
-        g = geometry(w)
+        g = panel_state()
         if g != last:
             last, since = g, time.monotonic()
         elif time.monotonic() - since >= quiet:
             return g
         time.sleep(0.05)
-    raise AssertionError("panel geometry never settled")
+    raise AssertionError("panel state never settled")
 
 
-def measure_hide_ms(w):
-    """Reveal the panel, leave it, return ms until it starts to move."""
+def measure_hide_ms():
+    """Put the pointer on the panel, leave it, return ms until it starts to hide."""
     centre = (SCREEN_W // 2, SCREEN_H // 2)
     move(*centre)
-    time.sleep(0.5)
-    hidden = settled(w)
-    move(*edge_point(hidden))
-    visible = settled(w)
+    hidden = settled()
+    # Autohide only starts once the pointer has been over the panel, so enter first.
+    move(*edge_point())
+    visible = settled()
     if visible == hidden:
-        raise AssertionError("panel did not reveal when pointer hit the screen edge")
+        raise AssertionError("panel did not reveal when the pointer hit the screen edge")
     t0 = time.monotonic()
     move(*centre)
     deadline = t0 + 12
     while time.monotonic() < deadline:
-        if geometry(w) != visible:
-            return (time.monotonic() - t0) * 1000
+        if panel_state() != visible:
+            ms = (time.monotonic() - t0) * 1000
+            settled(quiet=1.0, timeout=20)   # let it finish hiding before the next run
+            return ms
         time.sleep(0.005)
     raise AssertionError("panel never hid after the pointer left")
 
@@ -152,15 +170,14 @@ def test_popdown_properties_roundtrip():
 
 
 def test_popdown_slow_multiplier_scales_hide_delay():
-    w = panel_window()
-    xfconf_set("/panels/panel-1/autohide-behavior", 2)   # always
+    # the seeded config (xfce4-panel.xml) starts the panel in Always autohide mode
     xfconf_set("/panels/panel-1/popdown-delay", 300)
     xfconf_set("/panels/panel-1/popdown-slow-multiplier", 1)
     time.sleep(1)
-    t1 = measure_hide_ms(w)
+    t1 = measure_hide_ms()
     xfconf_set("/panels/panel-1/popdown-slow-multiplier", 4)
     time.sleep(1)
-    t4 = measure_hide_ms(w)
+    t4 = measure_hide_ms()
     print(f"      hide started after {t1:.0f} ms (multiplier 1), {t4:.0f} ms (multiplier 4)")
     assert 150 <= t1 <= 2000, f"multiplier 1 hide delay out of range: {t1:.0f} ms"
     assert t4 - t1 >= 600, f"multiplier 4 not slower enough (expected ~+900 ms): {t1:.0f} -> {t4:.0f} ms"

@@ -80,7 +80,10 @@ else
 fi
 
 step "Starting TightVNC desktop :$TEST_DISPLAY"
-mkdir -p "$TEST_HOME"
+# Fixed single-panel layout of built-in plugins only, so results do not depend
+# on the host's /etc/xdg default (which may name plugins that are not built here).
+mkdir -p "$TEST_HOME/.config/xfce4/xfconf/xfce-perchannel-xml"
+cp "$SRC_DIR/tests/vnc/xfce4-panel.xml" "$TEST_HOME/.config/xfce4/xfconf/xfce-perchannel-xml/"
 VNC_PW=$(tr -dc 'a-z0-9' < /dev/urandom | head -c8)
 printf '%s\n' "$VNC_PW" | tightvncpasswd -f > "$PASSWD_FILE"
 chmod 600 "$PASSWD_FILE"
