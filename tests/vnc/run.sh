@@ -47,12 +47,13 @@ TEST_HOME=$WORK_DIR/home
 PASSWD_FILE=$WORK_DIR/vnc-passwd
 RFB_PORT=$((5900 + TEST_DISPLAY))
 
+stop_desktop() {
+    DISPLAY_NUM=$TEST_DISPLAY TEST_HOME=$TEST_HOME PASSWD_FILE=$PASSWD_FILE \
+        PANEL_PREFIX=$PREFIX "$BUILD_SRC/vnc-panel.sh" stop >/dev/null 2>&1 || true
+}
 cleanup() {
     status=$?
-    if [ "$KEEP" != 1 ]; then
-        DISPLAY_NUM=$TEST_DISPLAY TEST_HOME=$TEST_HOME PASSWD_FILE=$PASSWD_FILE \
-            PANEL_PREFIX=$PREFIX "$BUILD_SRC/vnc-panel.sh" stop >/dev/null 2>&1 || true
-    fi
+    [ "$KEEP" = 1 ] || stop_desktop
     exit $status
 }
 trap cleanup EXIT
@@ -104,6 +105,7 @@ if [ "$KEEP" = 1 ]; then
     echo "KEEP=1: desktop :$TEST_DISPLAY left running; stop with:"
     echo "  DISPLAY_NUM=$TEST_DISPLAY TEST_HOME=$TEST_HOME PASSWD_FILE=$PASSWD_FILE PANEL_PREFIX=$PREFIX $BUILD_SRC/vnc-panel.sh stop"
 else
-    [ "$rc" = 0 ] && rm -rf "$WORK_DIR" || echo "work dir kept for inspection: $WORK_DIR"
+    stop_desktop   # before the work dir (and vnc-panel.sh with it) is removed
+    if [ "$rc" = 0 ]; then rm -rf "$WORK_DIR"; else echo "work dir kept for inspection: $WORK_DIR"; fi
 fi
 exit $rc
